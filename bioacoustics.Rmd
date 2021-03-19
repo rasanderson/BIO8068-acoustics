@@ -1,0 +1,17 @@
+---
+title: "Visualisation and analysis of wildlife acoustics"
+subtitle: "BIO8068 Data visualisation in Ecology"
+output:
+  word_document:
+    reference_docx: word_template.docx
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(behaviouR)
+```
+
+# Wildlife acoustic data
