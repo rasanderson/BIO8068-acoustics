@@ -15,3 +15,17 @@ library(behaviouR)
 ```
 
 # Wildlife acoustic data
+Audio data is becoming increasingly important in ecology and conservation. Whilst devices such as bat detectors have been used for many years, the advent of recording equipment left in the field to detect sounds has resulted in a much larger pool of data to draw on. Data is therefore not only collected by handheld devices, but also in camera traps (which sometimes monitor sound at the same time as a photograph and/or video), and also passive acoustic monitoring (PAM) devices such as the open source hardware system audioMoth <https://www.openacousticdevices.info/>. Audio data has a wide range of uses including:
+
+* detection of illegal poaching in game reserves <add ref>
+* monitor elephant behaviours <https://www.birds.cornell.edu/ccb/elephant-listening-project/>
+* better understand and conserve animals based on overall soundscapes <https://doi-org.libproxy.ncl.ac.uk/10.1111/csp2.72>
+* automatically identify species from their calls using machine learning <https://doi.org/10.1111/2041-210X.13357>
+
+## Aims of this practical
+The overall aim is to help you understand how to import audio data into R, undertake basic processing, learn about the concepts of Fast Fourier Transform (FFT) and creation of spectrograms, and how to compare different audio datasets. Many analytical methods are based on the `seewave` package but this has quite a steep learning curve, and other packages that access functions within `seewave` are easier to get started with for ecologists. Two particularly good packages are:
+
+* `warbleR` This, with its associated paper in Methods in Ecology & Evolution, provides an end-to-end workflow for analysis of bioacoustic data. It is available on CRAN, and auto-installs `seewave` and `NatureSounds`. The latter includes lots of example audio data.
+* `behaviouR` This is considerably easier to use, as it is aimed at teaching the main principles, but nevertheless is very powerful. We will use it in this practical. It is not available on CRAN, but a free online book is available at <https://bookdown.org/djc426/behaviouR-R-package-tutorials/> and this practical is derived from Chapter 3 of that text.
+
+# Getting started
