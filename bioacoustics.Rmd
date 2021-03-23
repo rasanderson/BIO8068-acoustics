@@ -141,3 +141,18 @@ v <- ggspectro(GibbonWaveFile, flim=c(0,2.5)) + # y-axis limits in kHz
 v
 ```
 
+## Displaying multiple spectrograms
+It is sometimes useful to compare multiple spectrograms side-by-side for ease of comparison. The `SpectrogramFunction` command takes as one of its arguments `input.dir` which is the folder that contains your .WAV files. It will then automatically go through all the recordings and create a spectrogram. the `par` function controls how many graphs are plotted in a single screen; we'll display 4 graphs, as the `c(2,2)` indicates 2-rows by 2-columns. After plotting the graphs, we'll revert back to one graph per screen. In RStudio use the left and right arrows above the plotting window to compare the plots.
+
+```{r, eval=FALSE}
+# We can tell R to print the spectrograms 2x2 using the code below
+par(mfrow = c(2, 2))
+
+# This is the function to create the spectrograms
+SpectrogramFunction(input.dir = "FocalRecordings", min.freq = 500, max.freq = 2500,
+                    Colours = "Colours")
+par(mfrow = c(1,1))
+```
+
+Once you have had a chance to look at the plots, you will notice that there are some big differences between genders and species. Go back to your File Explorer (Windows) or Finder (Apple Mac) and listen to some of the recordings again. How do they relate to the individual spectrograms? How are the different sounds colour-coded?
+
