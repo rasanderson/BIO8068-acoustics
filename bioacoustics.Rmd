@@ -12,6 +12,8 @@ output:
 knitr::opts_chunk$set(echo = TRUE)
 library(ggplot2)
 library(behaviouR)
+library(tuneR)
+library(seewave)
 ```
 
 # Wildlife acoustic data
@@ -29,3 +31,113 @@ The overall aim is to help you understand how to import audio data into R, under
 * `behaviouR` This is considerably easier to use, as it is aimed at teaching the main principles, but nevertheless is very powerful. We will use it in this practical. It is not available on CRAN, but a free online book is available at <https://bookdown.org/djc426/behaviouR-R-package-tutorials/> and this practical is derived from Chapter 3 of that text.
 
 # Getting started
+Begin by creating a new RStudio Project. If you wish, create it initially on GitHub and then initialise it from the version control option within RStudio. Then you can get into the habit of tracking and updating changes as you progress. Install and load the `behaviouR` package. When you install `behaviouR` it will also install the `tuneR` and `seewave` packages, which you may as well load to access their functions conveniently:
+
+```{r, eval=FALSE}
+# Install devtools from CRAN if not already done
+install.packages("devtools")
+devtools::install_github("https://github.com/DenaJGibbon/behaviouR")
+
+library(behaviouR)
+library(tuneR)
+library(seewave)
+library(ggplot2)
+```
+
+Next, create an R script within your RStudio Project to store the commands you are using for this practical example.
+
+# Southeast Asian gibbon monkey soundscapes
+We'll begin by downloading some sample data that has been provided for use with the `behaviouR` R package. To keep your audio data organised, we'll store them in a subfolder called `FocalRecordings`. The phrase _"Focal Recording"_ refers to all the audio events produced by an animal in a specified time-period, i.e when the audio equipment is recording. Ideally, all the sounds produced by **one** animal are recorded, although in practice lots of animals in the overall soundscape will be recorded in most situations.
+
+The audio files are actually available on GitHub, and we can use the following commands to create your `FocalRecordings` subfolder, and extract the sound files:
+
+```{r}
+# Now we will create folder in your RStudio Project called 'FocalRecordings'
+dir.create(file.path("FocalRecordings"), showWarnings = FALSE)
+
+# Now we will load the sound files that were in the behaviouR package
+githubURL <- "https://github.com/DenaJGibbon/behaviouRdata/raw/master/data/FocalRecordings.rda"
+FocalRecordings <- get(load(url(githubURL)))
+
+# Now we will save the recordings to the new folder you created as standard
+# audio .wav format files; You do not need to understand the next set of code
+# in detail
+for (a in 1:length(FocalRecordings)) {
+    FileName <- FocalRecordings[[a]][1][[1]]
+    WaveFile <- FocalRecordings[[a]][2][[1]]
+    writeWave(WaveFile, paste("FocalRecordings/", FileName, sep = ""))
+}
+```
+
+After the files have been uncompressed, go to your File Explorer (Windows) or Finder (Apple Mac) and you will see a set of **.wav** files have been created. The .wav format is a standard one for audio data - you should be able to double click on one of these files and depending on your system settings hear the content. Each one is about 10 seconds long: whilst you can hear the call of the individual monkey, there is also lots of background noise, such as birds, insect cicadas clicking etc.
+
+# Importing and displaying an individual `.wav` file
+Begin by importing the first female gibbon sound recording wave file, using the `readWave` function, which is part of the `tuneR` package:
+
+```{r}
+GibbonWaveFile <- readWave("FocalRecordings/FemaleGibbon_1.wav")
+GibbonWaveFile
+```
+
+What we see is that the soundfile is ~13 seconds long, was recorded at a sampling rate of 44100 samples per second and has a total of 572054 samples. We can check if that makes sense using the following equation (duration* sampling rate). The sampling rate is in Hertz, and one Hertz the basic unit of **frequency**, measured as one complete cycle of a sound wave per second:
+
+![](images/one_hertz.jpg)
+
+In practice, we usually work in kiloHertz (kHz) so this dataset has `GibbonWaveFile@samp.rate / 1000` kHz. The higher the frequency the higher is the **pitch** of the sound. You can also check that the duration makes sense in terms of the total number of records in the WAV file:
+
+```{r}
+duration(GibbonWaveFile) * GibbonWaveFile@samp.rate
+```
+
+You can plot the **amplitude** using the `oscillo` function, named after the "oscilloscope" originally used to create such graphs from sound recordings:
+
+```{r}
+oscillo(GibbonWaveFile)
+```
+
+The larger the **amplitude** the louder the sound, so the amplitude reflects **volume**. Amplitude is typically measured in decibels (dB). It is actually quite hard to see the individual waveform across the full 12+ seconds of the recording, so you can zoom in to a fraction of a second to display the waveform more clearly:
+
+```{r}
+oscillo(GibbonWaveFile, from = 0.1, to = 0.2)
+```
+
+Even here, it is difficult to see a lot of the wave patter clearly, especially near the start, so you can zoom in further, with the same `oscillo` function:
+
+```{r}
+oscillo(GibbonWaveFile, from = 0.15, to = 0.2)
+```
+
+## Creating a spectrogram
+A spectrogram shows how the spectrum of frequencies varies over time. It effectively shows the time on the x-axis, and the frequencies on the y-axis. It also shows the amplitude, but rather than doing so on a z-axis (to create a 3D plot), it is easier to show this in different colours, so as to keep it to a 2D plot. Most audio-processing software can create these directly from the original .WAV file, rather than the imported R object:
+
+```{r}
+SpectrogramSingle(sound.file = "FocalRecordings/FemaleGibbon_1.wav")
+```
+
+The default spectrogram is monochrome, but you can see in the above that there is very little information above about 3 kHz; this might be background noise in the forest, birdsong etc. The female gibbon calls are at lower frequencies, so let's zoom to that:
+
+```{r}
+SpectrogramSingle(sound.file = "FocalRecordings/FemaleGibbon_1.wav", min.freq = 500, 
+    max.freq = 2500)
+```
+
+You'll often find spectrograms easier to display in colour, so we can set that as an option:
+
+```{r}
+SpectrogramSingle(sound.file = "FocalRecordings/FemaleGibbon_1.wav", min.freq = 500, 
+    max.freq = 2500, Colors = "Colors")
+```
+
+If you prefer, you can create a `ggplot2` compatible spectrogram using the `ggspectro` function. Note that this operates on the R object (rather than the .WAV file) and is also  slower to produce output. However, it has the advantage of being easier to customise should you wish to create smarter output. I would recommend using the default `SpectrogramSingle` function, at least initially:
+
+```{r}
+# It is sometimes a case of trial-and error to get the limits and spectro.colors
+# at a suitable scale to see the information displayed nicely
+v <- ggspectro(GibbonWaveFile, flim=c(0,2.5)) + # y-axis limits in kHz
+  geom_tile(aes(fill=amplitude)) +
+  scale_fill_gradient2(name="Amplitude\n(dB)\n", limits=c(-60,0),
+                       na.value="transparent",
+                       low="green", mid="yellow", high="red", midpoint = -30)
+v
+```
+
