@@ -2,9 +2,9 @@
 title: "Visualisation and analysis of wildlife acoustics"
 subtitle: "BIO8068 Data visualisation in Ecology"
 output:
+  html_document: default
   word_document:
     reference_docx: word_template.docx
-  html_document: default
   pdf_document: default
 ---
 
@@ -14,7 +14,10 @@ library(ggplot2)
 library(behaviouR)
 library(tuneR)
 library(seewave)
+library(warbleR)
 library(dplyr)
+library(vegan)
+source("nes8010.R")
 ```
 
 # Wildlife acoustic data
@@ -193,13 +196,18 @@ The `MFCCFunction` function strips away the underscore and remaining part of the
 
 We can now analyse this dataframe via PCA. Use the `NES8010.R` script (on Canvas) to access the additional functions for ease of plotting, putting the script into your current RStudio Project folder. When we call the `ordi_pca()` function, remember to omit the first column which contains the `Class` grouping variable. You'll notice that for the `ordi_pca()` function we have added the option `scale=TRUE`. This scales the MFCC coefficients ("species", as they are columns)to zero mean and unit variance; it is quite common practice to do this when the data are quite skewed. Without it, there is a tendency for PCA Axis 1 to explain nearly all the variation, making the results hard to interpret.
 
-```{r}
+```{r, eval=FALSE}
 library(vegan) # This should already be installed from NES8010
 source("nes8010.R")
 
 # Use [, -1] to keep all rows but omit first column
 acoustics_pca <- ordi_pca(FeatureDataframe[, -1], scale=TRUE)
-head(summary(acoustics_pca), 3)
+summary(acoustics_pca)
+```
+
+```{r, echo=FALSE}
+acoustics_pca <- ordi_pca(FeatureDataframe[, -1], scale=TRUE)
+summary(acoustics_pca)$cont[[1]][1:3,1:4]
 ```
 
 What is the percentage variation explained by PCA Axis 1 and PCA Axis 2 ? Now you can visualise your individual sound recordings, i.e. the "sites" (rows) in your `FeatureDataframe`. We are not particularly interested in the actual MFCC coefficients ("species" or columns) so do not need to visualise them.
@@ -235,10 +243,6 @@ Once you have installed and loaded the package, let's search for blackbird _Turd
 ```{r}
 blackbird_songs <- query_xc(qword = 'Turdus merula cnt:"united kingdom" type:song len:5-25', download = FALSE)
 blackbird_alarm <- query_xc(qword = 'Turdus merula cnt:"united kingdom" type:alarm len:5-25', download = FALSE)
-
-no_songs <- nrow(blackbird_songs)
-no_alarm <- nrow(blackbird_alarm)
-
 ```
 
 It is possible to refine search terms further, for example adding an additional `type:male` will reduce it to only male audio, although note that many records do not specify the gender of the recorded bird. See <https://www.xeno-canto.org/help/search> for detailed explanations of some of the search options.
@@ -251,22 +255,35 @@ Another very handy function from `warbleR` allows you to create interactive `lea
 map_xc(blackbird_songs, leaflet.map = TRUE)
 ```
 
-Now that you have your set of audio recordings, you can download them for analysis.
+Now that you have your set of audio recordings, you can download them for analysis. As we have to do a bit of pre-processing by adjusting the download filenames to "tag" them as song calls or alarm calls, and convert them from .MP3 to .WAV format, it's easier to put them into separate folders.
 
-```{r}
-# Create subfolder in your RStudio Project called 'blackbirds'
-dir.create(file.path("blackbird_songs"), showWarnings = FALSE)
-dir.create(file.path("blackbird_alarm"), showWarnings = FALSE)
+```{r, eval=FALSE}
+# Create subfolders in your RStudio Project for song calls and alarm calls
+dir.create(file.path("blackbird_songs"))
+dir.create(file.path("blackbird_alarm"))
 
-
+# Download the .MP3 files into two separate sub-folders
 query_xc(X = blackbird_songs, path="blackbird_songs")
 query_xc(X = blackbird_alarm, path="blackbird_alarm")
 
 ```
 
-Have a look in 
+If you look in your File Explorer (Windows) or Finder (Mac) you should see all the .MP3 files listed. Double-click on some of them to listen: notice how variable in quality they are. Some are excellent, clear, with very little background noise. Others have excess wind noise, other species, and even vehicle traffic. Keep this in mind when looking at the results of the final analysis.
 
-```{r}
+The filenames are all of the format **Turdus-merula-xxxxxx.mp3** where the xxxxxx is the unique 6-digit code that xeno-canto uses to identify the records. We want to convert the file names to something like **Turdusmerula-song_xxxxxx.wav** or **Turdusmerula-alarm_xxxxxx.wav** so that when we pass it into the audio analysis via MFCC we automatically get a `Class` column labelled `Turdusmerula-song` or `Turdusmerula-alarm`. Recall that the MFCC function strips off the filename after the underscore "_" symbol to create the `Class` column.
+
+The following code looks a bit fierce, but conceptually it is quite simple. It:
+
+1. Obtains a list of all the file names in the `blackbird_songs` subfolder
+2. Creates an empty R object called `new_files` which will contain the new filenames
+3. Goes through a loop (the `for` function) to repeat a set of commands for each file
+i) Takes the name of each file, and uses `str_split` to sub-divide it into 3 pieces, based on where the dash `"-"` symbol is (look at the original filename and there are 2 dashes).
+ii) Concatenate the bits of the filename together using `str_c`, keeping the first two components together to create `Turdusmerula`, adding in text saying `-song_` which ends with an underscore, and adding in the last component, the `xxxxxx.mp3` from the file.
+iii) Add this name to the `new_files` object, which gradually gets longer as you loop through each filename.
+4. Rename all the files.
+
+
+```{r, message=FALSE, warning=FALSE}
 library(stringr) # part of tidyverse
 
 old_files <- list.files("blackbird_songs", full.names=TRUE)
@@ -277,7 +294,11 @@ for(file in 1:length(old_files)){
   new_files <- c(new_files, new_name)
 }
 file.rename(old_files, new_files)
+```
 
+This set of code can be used multiple times for different types of call, or indeed different bird species. Only very minor changes are needed for alarm calls:
+
+```{r, messages=FALSE, warnings=FALSE}
 old_files <- list.files("blackbird_alarm", full.names=TRUE)
 new_files <- NULL
 for(file in 1:length(old_files)){
@@ -286,54 +307,83 @@ for(file in 1:length(old_files)){
   new_files <- c(new_files, new_name)
 }
 file.rename(old_files, new_files)
+```
 
-dir.create(file.path("blackbird_audio"), showWarnings = FALSE)
+Now that you have renamed all your original .MP3 files, it is simply a case of copying them over to a new subfolder in your RStudio Project, called `blackbird_audio`
+
+```{r, eval=FALSE}
+dir.create(file.path("blackbird_audio"))
 file.copy(from=paste0("blackbird_songs/",list.files("blackbird_songs")),
           to="blackbird_audio")
 file.copy(from=paste0("blackbird_alarm/",list.files("blackbird_alarm")),
           to="blackbird_audio")
-
 ```
 
-We want to work with .WAV files (wave files) rather than .MP3, so we will use the `mp32wav` function from the `warbleR` R package as a convenience function
+We want to work with .WAV files (wave files) rather than .MP3, so we will use the `mp32wav` function from the `warbleR` R package as a convenience function to bulk convert all the files. To save disk space, we also delete the old .MP3 files, although you may wish to check that the conversion has run OK before running the `file_remove` function:
 
-```{r, echo=FALSE}
+```{r, eval=FALSE}
 mp32wav(path="blackbird_audio", dest.path="blackbird_audio")
 unwanted_mp3 <- dir(path="blackbird_audio", pattern="*.mp3")
 file.remove(paste0("blackbird_audio/", unwanted_mp3))
 ```
 
 
-## Now simplify and analyse some of these data
-### Single blackbird, spectrogram
+## Visualise and analyse the song and alarm calls
+### Single blackbird, oscillogram and spectrogram
+We'll begin by taking a single bird, and looking at its oscillogram. **Note**: the exact filenames you download may differ slightly from those shown in this schedule, depending on any updates or changes to the xeno-canto database. For this particular example, notice that it is a stereo recording. This triggers warning messages when you do the MFCC calculations later, as MFCC is currently only calculated on one channel. Some of the recordings are mono.
 
 ```{r}
 blackbird_wav <- readWave("blackbird_audio/Turdusmerula-song_243908.wav")
 blackbird_wav
+```
+
+Plot the full frequency diagram on screen with the `oscillo` then go back to the original .WAV file and listen to it, so you have an understanding of how the oscillogram changes with the sound. To see the detail, again you may have to zoom in.
+
+```{r}
 oscillo(blackbird_wav)
 oscillo(blackbird_wav, from = 0.59, to = 0.60)
 ```
+
+Next create a spectrogram of a single bird .WAV file, using a colour display. Note how for many blackbird songs, there is a wide range of activity on the y-axis (frequency). Create spectrograms for several different song and alarm files, listen to them, and get familiar with the patterns.
+
 ```{r}
 SpectrogramSingle(sound.file = "blackbird_audio/Turdusmerula-song_243908.wav",
                   Colors = "Colors")
 
 ```
 
-### MFCC of blackbirds
-```{r}
+### MFCC of blackbird song and alarm calls
+Finally, we are going to simplify the blackbird data through **feature extraction** using the Mel-frequency cepstral coefficient technique (MFCC) you learnt about earlier. Again, we will stick to the default options in terms of bandwidth etc. However, if you look at the help page for `MFCCFunction` you'll notice that by default the maximum frequency it works to is 2000 Hz. As some of the blackbird songs seemed to be pushing quite high, we'll change this to 7000 Hz. The output still has 178 columns, but the number of rows is bigger (88 in my case) reflecting the number of audio files. You may receive warnings related to the numbers of channels etc. depending on whether the data is in mono or stereo, but can ignore these:
+
+```{r, warning=FALSE, message=FALSE, results=FALSE}
 blackbird_mfcc <- MFCCFunction(input.dir = "blackbird_audio",
                                max.freq=7000)
 dim(blackbird_mfcc)
 ```
 
-### blackbird PCA
-```{r}
-blackbird_pca <- ordi_pca(blackbird_mfcc[, -1], scale=TRUE)
+Finally let's complete our analysis by doing a PCA of the data, to visualise the patterns in a 2 dimensional plot. Remember to add `scale=TRUE` to your call to `ordi_pca`, and to omit the first column with `[-1 ,]` 
 
+```{r, eval=FALSE}
+blackbird_pca <- ordi_pca(blackbird_mfcc[, -1], scale=TRUE)
+summary(blackbird_pca)
+```
+
+```{r, echo=FALSE}
+blackbird_pca <- ordi_pca(blackbird_mfcc[, -1], scale=TRUE)
+summary(blackbird_pca)$cont[[1]][1:3,1:4]
+```
+
+You can see that the percentage variation explained is considerably lower than the example with the monkey calls. This is because we are working with just one species, and it is Citizen Science data. We have also not "filtered" the audio based on the quality, for example only selecting "A" or "B" (high quality) and omitting "D" or "E" (poor quality) audio. This is reflected in the final PCA plot
+
+```{r}
 blackbird_sco <- ordi_scores(blackbird_pca, display="sites")
 blackbird_sco <- mutate(blackbird_sco, group_code = blackbird_mfcc$Class)
 
 ggplot(blackbird_sco, aes(x=PC1, y=PC2, colour=group_code)) +
-  geom_point()
+  geom_point() 
 ```
 
+You can see a big overlap between the alarm and song calls. Listening to some of the audio, you will notice that what people have described as alarm calls is actually quite variable; classically it is a "cluck-cluck-cluck" sound in rapid succession, but many other calls are included. This explains the greater variability in the alarm calls in the PCA plot. Nevertheless, you can see that even with these data, you can see a separation between the calls, with most of the songs on the lower right of the plot, and most alarms on the upper left.
+
+## In your own time
+Try downloading some more data from xeno-canto, e.g. for 2 or 3 different species of birds, with very different calls, and repeat the type of analysis you have done for blackbirds. If you are adventerous, record some songbirds on your mobile phone (early morning is good). Try to avoid traffic or wind noise, and just record a single individual singing. Create a spectrogram of the call.
