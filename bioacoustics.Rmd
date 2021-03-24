@@ -14,6 +14,7 @@ library(ggplot2)
 library(behaviouR)
 library(tuneR)
 library(seewave)
+library(dplyr)
 ```
 
 # Wildlife acoustic data
@@ -42,6 +43,7 @@ library(behaviouR)
 library(tuneR)
 library(seewave)
 library(ggplot2)
+library(dplyr)
 ```
 
 Next, create an R script within your RStudio Project to store the commands you are using for this practical example.
@@ -89,7 +91,7 @@ In practice, we usually work in kiloHertz (kHz) so this dataset has `GibbonWaveF
 duration(GibbonWaveFile) * GibbonWaveFile@samp.rate
 ```
 
-You can plot the **amplitude** using the `oscillo` function, named after the "oscilloscope" originally used to create such graphs from sound recordings:
+You can plot the **amplitude** using the `oscillo` function, to create an oscillogram plot from sound recordings that shows changes in amplitude over time. Oscillations 'reverberate' around a central line. Think about the behaviour of a plucked string on a guitar:
 
 ```{r}
 oscillo(GibbonWaveFile)
@@ -156,3 +158,64 @@ par(mfrow = c(1,1))
 
 Once you have had a chance to look at the plots, you will notice that there are some big differences between genders and species. Go back to your File Explorer (Windows) or Finder (Apple Mac) and listen to some of the recordings again. How do they relate to the individual spectrograms? How are the different sounds colour-coded?
 
+# Simplifying the audio data to allow multivariate analysis
+Audio datasets are complex and large, which makes them challenging to analyses. There are two major, but complementary, methods that have been used to analyse such datasets:
+
+* Deep learning through convolutional neural networks. This is the most powerful method, and it uses deep learning methods traditionally applied to photographs to the actual spectrograms. The main problem is that large datasets are needed to train the models before they have sufficient levels of accuracy.
+* Multivariate methods, such as principal components analysis. You have already encountered these types of techniques in NES8010, where you reduced tables with e.g. 15 sites by 50 species to two dimensions in PCA 1 and PCA 2 to visualise.
+
+If you look in your `FocalRecordings` folder we have 12 .WAV files, which will be the equivalent to your sites or samples from when you did multivariate analysis in NES8010. The problem here, however, is that you don't have 50 or 150 species (columns). For each .WAV file you have thousands of samples. Look at the `FemaleGibbonFile` R object and you can see that it actually has 570,054 elements. This is far too many for a PCA, and a lot of the information is redundant or noise.
+
+## Mel-frequency cepstral coefficients (MFCC)
+Pardon? These are a standard technique to simplify audio data, looking for repeated patterns in the sounds, and undertaking "feature extraction". Feature extraction is a way of simplifying very complex data to a much simplifer form, more amenable for analysis. Indeed, some might argue that when you do a PCA it is a type of feature extraction. For audio data MFCC has proved to be a particularly robust technique. It involves the following main steps; don't worry if you do not fully understand all of them, this is just to give you a rough idea of what is going on so that it is not a complete black-box mystery. A key point is that the pitch of sounds (kHz or frequency) is not really linear in how it is perceived. Go to a site such as <https://onlinetonegenerator.com/> (**do not have your speaker set too high**) and compare some sounds 200 kHz apart. Even if the distance apart is the same, they may not sound equally different.
+
+1. Take the Fourier transform of the audio signal. Imagine you played the note C-natural on a piano: you would hear a single note. Then imagine you played A-natural. Again a single note. But if you play a two-note chord C and A, the waveforms interact with each other, which is why you hear a chord. Fourier transform helps disentangle patterns in audio based on the underlying sounds. The mathematics are complex, but there is a nice graphical explanation at <https://youtu.be/spUNpyF58BY>
+2. Convert the powers of the key frequencies detected by the Fourier transform using a "Mel scale". A mel scale, named after melody, is a perceptual scale of pitches, judged to be equal frequency apart from each other. It uses triangular overlapping windows, laid on top of the Fourier output, to simplify the information.
+3. Take logarithms of the values in each overlapping window
+4. Take the cosine of the logarithms
+5. The coefficients are the amplitudes of the resulting spectra
+
+Phew! Sounds complicated, and it is. Fortunately you can compress your original data from over 500,000 records per .WAV file to a manageable number of about 100-200 mel-frequency coefficients using the `MFCCFunction` command, which will process all 12 .WAV files in your `FocalRecordings` sub-folder:
+
+```{r}
+FeatureDataframe <- MFCCFunction(input.dir = "FocalRecordings")
+dim(FeatureDataframe)
+```
+
+You'll recall that the original .WAV file we looked at had over 500,000 pieces of data. By extracting the key components using MFCC we have managed to reduce it to 178 components. If you look at the resulting data.frame by using `View(FeatureDataframe)` you can see the individual rows and columns in the dataset. The first column is called `Class` and is actually derived from the filenames of your .WAV files. Your first four .WAV files are called:
+
+* FemaleGibbon_1.wav
+* FemaleGibbon_2.wav
+* FemaleGibbon_3.wav
+* etc.
+
+The `MFCCFunction` function strips away the underscore and remaining part of the filename, and uses the earlier part to create the contents of the `Class` column. This provides a convenient way for you to name your .WAV files so that you can group them according to different species or genders.
+
+We can now analyse this dataframe via PCA. Use the `NES8010.R` script (on Canvas) to access the additional functions for ease of plotting, putting the script into your current RStudio Project folder. When we call the `ordi_pca()` function, remember to omit the first column which contains the `Class` grouping variable. You'll notice that for the `ordi_pca()` function we have added the option `scale=TRUE`. This scales the MFCC coefficients ("species", as they are columns)to zero mean and unit variance; it is quite common practice to do this when the data are quite skewed. Without it, there is a tendency for PCA Axis 1 to explain nearly all the variation, making the results hard to interpret.
+
+```{r}
+library(vegan) # This should already be installed from NES8010
+source("nes8010.R")
+
+# Use [, -1] to keep all rows but omit first column
+acoustics_pca <- ordi_pca(FeatureDataframe[, -1], scale=TRUE)
+head(summary(acoustics_pca), 3)
+```
+
+What is the percentage variation explained by PCA Axis 1 and PCA Axis 2 ? Now you can visualise your individual sound recordings, i.e. the "sites" (rows) in your `FeatureDataframe`. We are not particularly interested in the actual MFCC coefficients ("species" or columns) so do not need to visualise them.
+
+```{r}
+ordi_plot(acoustics_pca, display="sites")
+```
+
+You can see that there are three groups of points. Do these align with your three sets of animal recordings, for female gibbons, great argus and male solo monkeys? You can redraw the graph, by extracting the scores and using `ggplot2` labelling:
+
+```{r}
+acoustics_sco <- ordi_scores(acoustics_pca, display="sites")
+acoustics_sco <- mutate(acoustics_sco, group_code = FeatureDataframe$Class)
+
+ggplot(acoustics_sco, aes(x=PC1, y=PC2, colour=group_code)) +
+  geom_point()
+```
+
+You can see clearly how the sounds produced by the three groups of monkeys are quite different to each other. **Try yourself**: go back and look at the NES8010 Constrained ordination and classification practical. Improve the plot by adding convex hulls around each group of points, add the % variation explained to the axis labels, change `group_code` in the legend to `Monkey type`, change the individual labels for each monkey so spaces are present. This will all involve minor changes to your `ggplot` command, with additional lines needed. Try adding one extra line at a time.
