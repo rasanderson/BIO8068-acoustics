@@ -48,7 +48,7 @@ library(dplyr)
 
 Next, create an R script within your RStudio Project to store the commands you are using for this practical example.
 
-# Southeast Asian gibbon monkey soundscapes
+# Southeast Asian monkey recordings
 We'll begin by downloading some sample data that has been provided for use with the `behaviouR` R package. To keep your audio data organised, we'll store them in a subfolder called `FocalRecordings`. The phrase _"Focal Recording"_ refers to all the audio events produced by an animal in a specified time-period, i.e when the audio equipment is recording. Ideally, all the sounds produced by **one** animal are recorded, although in practice lots of animals in the overall soundscape will be recorded in most situations.
 
 The audio files are actually available on GitHub, and we can use the following commands to create your `FocalRecordings` subfolder, and extract the sound files:
@@ -219,3 +219,84 @@ ggplot(acoustics_sco, aes(x=PC1, y=PC2, colour=group_code)) +
 ```
 
 You can see clearly how the sounds produced by the three groups of monkeys are quite different to each other. **Try yourself**: go back and look at the NES8010 Constrained ordination and classification practical. Improve the plot by adding convex hulls around each group of points, add the % variation explained to the axis labels, change `group_code` in the legend to `Monkey type`, change the individual labels for each monkey so spaces are present. This will all involve minor changes to your `ggplot` command, with additional lines needed. Try adding one extra line at a time.
+
+# Songbird analysis
+The xeno-canto dataset provides a huge international dataset of Citizen Science acoustic data. The quality and duration of the audio clips is quite variable, and as you might expect there are more recordings of some of the most common species. This provides an invaluable resource to explore birdsongs, and you can access it at <https://www.xeno-canto.org/> If you visit the website, you will see that you can search by species, listen to songs, view spectrograms etc.
+
+The R package `warbleR` contains some advanced methods for bioacoustic analysis, which we will not explore in this module. However, it contains a number of functions which make it very easy to bulk download recordings from the xeno-canto database.
+
+```{r, eval=FALSE}
+install.packages("warbleR")
+library(warbler)
+```
+
+Once you have installed and loaded the package, let's search for blackbird _Turdus merula_ recordings in the UK. We restrict our length of recordings to 5 to 25 seconds, and as blackbirds' songs and alarm calls are quite distinct, will search for them separately. Note that the following commands have `download = FALSE` so we are just checking the records in xeno-canto, not actually downloading the audio.
+
+```{r}
+blackbird_songs <- query_xc(qword = 'Turdus merula cnt:"united kingdom" type:song len:5-25', download = FALSE)
+blackbird_alarm <- query_xc(qword = 'Turdus merula cnt:"united kingdom" type:alarm len:5-25', download = FALSE)
+
+no_songs <- nrow(blackbird_songs)
+no_alarm <- nrow(blackbird_alarm)
+
+```
+
+It is possible to refine search terms further, for example adding an additional `type:male` will reduce it to only male audio, although note that many records do not specify the gender of the recorded bird. See <https://www.xeno-canto.org/help/search> for detailed explanations of some of the search options.
+
+Have a look at the two dataframes you have just created. You can see that there is a lot of information, with links to spectrograms and recordings of each audio clip. There is also a "quality" column coded A to E. Audio rated A is the highest quality (good, clear sound, little background noise) and E the poorest. Note also the columns for other species. When listening to songbirds, you are unlikely to hear just one species at a time.
+
+Another very handy function from `warbleR` allows you to create interactive `leaflet` maps, with popups for the location of each recording. If you click on the popup there are links to the xeno-canto site with the spectogram, as well as a "listen" link so you can hear the song. More information is given at <https://marce10.github.io/2020/03/15/leaflet_xcmaps.html>:
+
+```{r}
+map_xc(blackbird_songs, leaflet.map = TRUE)
+```
+
+Now that you have your set of audio recordings, you can download them for analysis.
+
+```{r}
+# Create subfolder in your RStudio Project called 'blackbirds'
+dir.create(file.path("blackbird_songs"), showWarnings = FALSE)
+dir.create(file.path("blackbird_alarm"), showWarnings = FALSE)
+
+
+query_xc(X = blackbird_songs, path="blackbird_songs")
+query_xc(X = blackbird_alarm, path="blackbird_alarm")
+
+```
+
+Have a look in 
+
+```{r}
+library(stringr) # part of tidyverse
+
+old_files <- list.files("blackbird_songs", full.names=TRUE)
+new_files <- NULL
+for(file in 1:length(old_files)){
+  curr_file <- str_split(old_files[file], "-")
+  new_name <- str_c(c(curr_file[[1]][1:2], "-song_", curr_file[[1]][3]), collapse="")
+  new_files <- c(new_files, new_name)
+}
+file.rename(old_files, new_files)
+
+old_files <- list.files("blackbird_alarm", full.names=TRUE)
+new_files <- NULL
+for(file in 1:length(old_files)){
+  curr_file <- str_split(old_files[file], "-")
+  new_name <- str_c(c(curr_file[[1]][1:2], "-alarm_", curr_file[[1]][3]), collapse="")
+  new_files <- c(new_files, new_name)
+}
+file.rename(old_files, new_files)
+
+file.copy(from=paste0("blackbird_songs/",list.files("blackbird_songs")), to="blackbirds")
+file.copy(from=paste0("blackbird_alarm/",list.files("blackbird_alarm")), to="blackbirds")
+
+```
+
+
+```{r}
+
+query_xc(X = blackbird_alarm, path="blackbirds", file.name = c("Genus",
+                                                              "Specific_epithet",
+                                                              "Vocalization_type"))
+```
+
