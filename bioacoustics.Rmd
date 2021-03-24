@@ -287,16 +287,53 @@ for(file in 1:length(old_files)){
 }
 file.rename(old_files, new_files)
 
-file.copy(from=paste0("blackbird_songs/",list.files("blackbird_songs")), to="blackbirds")
-file.copy(from=paste0("blackbird_alarm/",list.files("blackbird_alarm")), to="blackbirds")
+dir.create(file.path("blackbird_audio"), showWarnings = FALSE)
+file.copy(from=paste0("blackbird_songs/",list.files("blackbird_songs")),
+          to="blackbird_audio")
+file.copy(from=paste0("blackbird_alarm/",list.files("blackbird_alarm")),
+          to="blackbird_audio")
 
 ```
 
+We want to work with .WAV files (wave files) rather than .MP3, so we will use the `mp32wav` function from the `warbleR` R package as a convenience function
+
+```{r, echo=FALSE}
+mp32wav(path="blackbird_audio", dest.path="blackbird_audio")
+unwanted_mp3 <- dir(path="blackbird_audio", pattern="*.mp3")
+file.remove(paste0("blackbird_audio/", unwanted_mp3))
+```
+
+
+## Now simplify and analyse some of these data
+### Single blackbird, spectrogram
 
 ```{r}
+blackbird_wav <- readWave("blackbird_audio/Turdusmerula-song_243908.wav")
+blackbird_wav
+oscillo(blackbird_wav)
+oscillo(blackbird_wav, from = 0.59, to = 0.60)
+```
+```{r}
+SpectrogramSingle(sound.file = "blackbird_audio/Turdusmerula-song_243908.wav",
+                  Colors = "Colors")
 
-query_xc(X = blackbird_alarm, path="blackbirds", file.name = c("Genus",
-                                                              "Specific_epithet",
-                                                              "Vocalization_type"))
+```
+
+### MFCC of blackbirds
+```{r}
+blackbird_mfcc <- MFCCFunction(input.dir = "blackbird_audio",
+                               max.freq=7000)
+dim(blackbird_mfcc)
+```
+
+### blackbird PCA
+```{r}
+blackbird_pca <- ordi_pca(blackbird_mfcc[, -1], scale=TRUE)
+
+blackbird_sco <- ordi_scores(blackbird_pca, display="sites")
+blackbird_sco <- mutate(blackbird_sco, group_code = blackbird_mfcc$Class)
+
+ggplot(blackbird_sco, aes(x=PC1, y=PC2, colour=group_code)) +
+  geom_point()
 ```
 
