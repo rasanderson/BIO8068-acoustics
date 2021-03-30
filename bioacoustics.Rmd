@@ -235,7 +235,7 @@ The R package `warbleR` contains some advanced methods for bioacoustic analysis,
 
 ```{r, eval=FALSE}
 install.packages("warbleR")
-library(warbler)
+library(warbleR)
 ```
 
 Once you have installed and loaded the package, let's search for blackbird _Turdus merula_ recordings in the UK. We restrict our length of recordings to 5 to 25 seconds, and as blackbirds' songs and alarm calls are quite distinct, will search for them separately. Note that the following commands have `download = FALSE` so we are just checking the records in xeno-canto, not actually downloading the audio.
